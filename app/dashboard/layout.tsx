@@ -1,21 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { 
-  FileText, 
-  Home, 
-  Upload, 
-  Search, 
-  Settings, 
-  LogOut, 
-  Menu, 
+import {
+  FileText,
+  Home,
+  Upload,
+  Search,
+  Settings,
+  LogOut,
+  Menu,
   X,
   User,
   HardDrive
 } from 'lucide-react';
-import { formatFileSize } from '@/lib/api';
+import { formatFileSize, filesApi } from '@/lib/api';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -23,6 +23,7 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [storageInfo, setStorageInfo] = useState({ used: 0, limit: 15000000000 });
   const { user, logout } = useAuth();
   const router = useRouter();
 
@@ -30,6 +31,27 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     await logout();
     router.push('/login');
   };
+
+  // Load storage information
+  useEffect(() => {
+    const loadStorageInfo = async () => {
+      try {
+        const response = await filesApi.getFiles();
+        if (response.success) {
+          setStorageInfo({
+            used: response.data.storage_used,
+            limit: response.data.storage_limit
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load storage info:', error);
+      }
+    };
+
+    if (user) {
+      loadStorageInfo();
+    }
+  }, [user]);
 
   const navigation = [
     { name: 'Files', href: '/dashboard', icon: Home, current: true },
@@ -116,13 +138,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 Storage Used
               </div>
               <div className="w-full bg-background rounded-full h-2 mb-2">
-                <div 
-                  className="bg-primary h-2 rounded-full transition-all duration-300" 
-                  style={{ width: '25%' }}
+                <div
+                  className="bg-primary h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min((storageInfo.used / storageInfo.limit) * 100, 100)}%` }}
                 ></div>
               </div>
               <div className="text-xs text-muted-foreground">
-                {formatFileSize(3750000000)} of {formatFileSize(15000000000)} used
+                {formatFileSize(storageInfo.used)} of {formatFileSize(storageInfo.limit)} used
               </div>
             </div>
           </div>
