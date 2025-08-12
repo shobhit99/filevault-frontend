@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { filesApi, foldersApi, FileItem, FolderItem, formatFileSize, formatDate, getFileIcon } from '@/lib/api';
 import toast from 'react-hot-toast';
+import FilePreviewModal from '@/components/FilePreviewModal';
 
 export default function DashboardPage() {
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -36,6 +37,8 @@ export default function DashboardPage() {
   const [newFolderName, setNewFolderName] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [storageInfo, setStorageInfo] = useState({ used: 0, limit: 15000000000 });
+  const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   const loadFiles = useCallback(async () => {
     try {
@@ -152,6 +155,16 @@ export default function DashboardPage() {
       setSortBy(field);
       setSortOrder('asc');
     }
+  };
+
+  const handlePreviewFile = (file: FileItem) => {
+    setPreviewFile(file);
+    setShowPreview(true);
+  };
+
+  const handleClosePreview = () => {
+    setShowPreview(false);
+    setPreviewFile(null);
   };
 
   const filteredFiles = files.filter(file =>
@@ -409,15 +422,13 @@ export default function DashboardPage() {
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="flex space-x-1">
                       {file.s3_url && (
-                        <a
-                          href={file.s3_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          onClick={() => handlePreviewFile(file)}
                           className="p-1 bg-background/80 rounded text-muted-foreground hover:text-foreground transition-colors"
-                          title="View file"
+                          title="Preview file"
                         >
                           <Eye className="h-3 w-3" />
-                        </a>
+                        </button>
                       )}
                       <button
                         onClick={() => handleDeleteFile(file.id)}
@@ -474,15 +485,13 @@ export default function DashboardPage() {
                   <div className="col-span-3 text-muted-foreground">{formatDate(file.created_at)}</div>
                   <div className="col-span-1 flex space-x-1">
                     {file.s3_url && (
-                      <a
-                        href={file.s3_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        onClick={() => handlePreviewFile(file)}
                         className="p-1 text-muted-foreground hover:text-foreground transition-colors"
-                        title="View file"
+                        title="Preview file"
                       >
                         <Eye className="h-4 w-4" />
-                      </a>
+                      </button>
                     )}
                     <button
                       onClick={() => handleDeleteFile(file.id)}
@@ -523,6 +532,13 @@ export default function DashboardPage() {
           )}
         </>
       )}
+
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        isOpen={showPreview}
+        onClose={handleClosePreview}
+        file={previewFile}
+      />
     </div>
   );
 }
