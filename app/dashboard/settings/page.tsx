@@ -1,20 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  User, 
-  Mail, 
-  Lock, 
-  HardDrive, 
-  Shield, 
-  Bell, 
-  Trash2, 
+import {
+  User,
+  Mail,
+  Lock,
+  HardDrive,
+  Shield,
+  Trash2,
   Save,
   Eye,
   EyeOff
 } from 'lucide-react';
-import { formatFileSize } from '@/lib/api';
+import { formatFileSize, filesApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 
 export default function SettingsPage() {
@@ -23,12 +22,7 @@ export default function SettingsPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // Form states
-  const [profileData, setProfileData] = useState({
-    username: user?.username || '',
-    email: user?.email || '',
-  });
+  const [storageInfo, setStorageInfo] = useState({ used: 0, limit: 15000000000 });
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -36,23 +30,32 @@ export default function SettingsPage() {
     confirmPassword: '',
   });
 
-  const [notificationSettings, setNotificationSettings] = useState({
-    emailNotifications: true,
-    uploadNotifications: true,
-    storageAlerts: true,
-  });
-
   const tabs = [
     { id: 'profile', name: 'Profile', icon: User },
     { id: 'security', name: 'Security', icon: Shield },
     { id: 'storage', name: 'Storage', icon: HardDrive },
-    { id: 'notifications', name: 'Notifications', icon: Bell },
   ];
 
-  const handleProfileSave = async () => {
-    // TODO: Implement profile update API call
-    toast.success('Profile updated successfully');
-  };
+  // Load storage information
+  useEffect(() => {
+    const loadStorageInfo = async () => {
+      try {
+        const response = await filesApi.getFiles();
+        if (response.success) {
+          setStorageInfo({
+            used: response.data.storage_used,
+            limit: response.data.storage_limit
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load storage info:', error);
+      }
+    };
+
+    if (user) {
+      loadStorageInfo();
+    }
+  }, [user]);
 
   const handlePasswordChange = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
@@ -66,11 +69,6 @@ export default function SettingsPage() {
     // TODO: Implement password change API call
     toast.success('Password changed successfully');
     setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-  };
-
-  const handleNotificationSave = async () => {
-    // TODO: Implement notification settings API call
-    toast.success('Notification settings updated');
   };
 
   return (
@@ -119,9 +117,9 @@ export default function SettingsPage() {
                     </div>
                     <input
                       type="text"
-                      value={profileData.username}
-                      onChange={(e) => setProfileData({ ...profileData, username: e.target.value })}
-                      className="block w-full pl-10 pr-3 py-3 border border-input rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                      value={user?.username || ''}
+                      disabled
+                      className="block w-full pl-10 pr-3 py-3 border border-input rounded-lg bg-muted text-muted-foreground cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -136,20 +134,16 @@ export default function SettingsPage() {
                     </div>
                     <input
                       type="email"
-                      value={profileData.email}
-                      onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                      className="block w-full pl-10 pr-3 py-3 border border-input rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                      value={user?.email || ''}
+                      disabled
+                      className="block w-full pl-10 pr-3 py-3 border border-input rounded-lg bg-muted text-muted-foreground cursor-not-allowed"
                     />
                   </div>
                 </div>
 
-                <button
-                  onClick={handleProfileSave}
-                  className="flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </button>
+                <p className="text-sm text-muted-foreground">
+                  Username and email cannot be changed. Contact support if you need to update these details.
+                </p>
               </div>
             </div>
           )}
@@ -265,17 +259,17 @@ export default function SettingsPage() {
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-foreground">Storage Used</span>
                     <span className="text-sm text-muted-foreground">
-                      {formatFileSize(3750000000)} of {formatFileSize(15000000000)}
+                      {formatFileSize(storageInfo.used)} of {formatFileSize(storageInfo.limit)}
                     </span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-3">
-                    <div 
-                      className="bg-primary h-3 rounded-full transition-all duration-300" 
-                      style={{ width: '25%' }}
+                    <div
+                      className="bg-primary h-3 rounded-full transition-all duration-300"
+                      style={{ width: `${Math.min((storageInfo.used / storageInfo.limit) * 100, 100)}%` }}
                     ></div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    25% of your storage quota is being used
+                    {((storageInfo.used / storageInfo.limit) * 100).toFixed(1)}% of your storage quota is being used
                   </p>
                 </div>
 
@@ -298,79 +292,6 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Notifications Tab */}
-          {activeTab === 'notifications' && (
-            <div className="bg-card border border-border rounded-xl p-6">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Notification Preferences</h2>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Email Notifications</p>
-                    <p className="text-xs text-muted-foreground">Receive notifications via email</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notificationSettings.emailNotifications}
-                      onChange={(e) => setNotificationSettings({ 
-                        ...notificationSettings, 
-                        emailNotifications: e.target.checked 
-                      })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Upload Notifications</p>
-                    <p className="text-xs text-muted-foreground">Get notified when uploads complete</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notificationSettings.uploadNotifications}
-                      onChange={(e) => setNotificationSettings({ 
-                        ...notificationSettings, 
-                        uploadNotifications: e.target.checked 
-                      })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Storage Alerts</p>
-                    <p className="text-xs text-muted-foreground">Alert when storage is running low</p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={notificationSettings.storageAlerts}
-                      onChange={(e) => setNotificationSettings({ 
-                        ...notificationSettings, 
-                        storageAlerts: e.target.checked 
-                      })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                  </label>
-                </div>
-
-                <button
-                  onClick={handleNotificationSave}
-                  className="flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Preferences
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -406,7 +406,26 @@ export default function DashboardPage() {
                   className="group bg-card border border-border rounded-xl p-4 hover:shadow-lg transition-all duration-200 relative"
                 >
                   <div className="flex flex-col items-center text-center">
-                    <div className="text-4xl mb-2">{getFileIcon(file.name)}</div>
+                    {file.thumbnail_url ? (
+                      <div className="w-16 h-16 mb-2 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                        <img
+                          src={file.thumbnail_url}
+                          alt={file.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Fallback to icon if thumbnail fails to load
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              parent.innerHTML = `<div class="text-4xl">${getFileIcon(file.name)}</div>`;
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="text-4xl mb-2">{getFileIcon(file.name)}</div>
+                    )}
                     <p className="text-sm font-medium text-foreground truncate w-full" title={file.name}>
                       {file.name}
                     </p>
@@ -478,7 +497,26 @@ export default function DashboardPage() {
                   className="grid grid-cols-12 gap-4 p-4 border-b border-border hover:bg-accent/50 transition-colors"
                 >
                   <div className="col-span-6 flex items-center">
-                    <span className="text-2xl mr-3">{getFileIcon(file.name)}</span>
+                    {file.thumbnail_url ? (
+                      <div className="w-8 h-8 mr-3 rounded overflow-hidden bg-muted flex items-center justify-center">
+                        <img
+                          src={file.thumbnail_url}
+                          alt={file.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Fallback to icon if thumbnail fails to load
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              parent.innerHTML = `<span class="text-2xl">${getFileIcon(file.name)}</span>`;
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-2xl mr-3">{getFileIcon(file.name)}</span>
+                    )}
                     <span className="text-foreground">{file.name}</span>
                   </div>
                   <div className="col-span-2 text-muted-foreground">{formatFileSize(file.size)}</div>
