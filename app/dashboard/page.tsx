@@ -21,6 +21,7 @@ import {
 import { filesApi, foldersApi, FileItem, FolderItem, formatFileSize, formatDate, getFileIcon } from '@/lib/api';
 import toast from 'react-hot-toast';
 import FilePreviewModal from '@/components/FilePreviewModal';
+import ConfirmationModal from '@/components/ConfirmationModal';
 
 export default function DashboardPage() {
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -39,6 +40,10 @@ export default function DashboardPage() {
   const [storageInfo, setStorageInfo] = useState({ used: 0, limit: 15000000000 });
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [deleteFile, setDeleteFile] = useState<FileItem | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{[key: string]: number}>({});
+  const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
 
   const loadFiles = useCallback(async () => {
     try {
@@ -69,14 +74,43 @@ export default function DashboardPage() {
   }, [loadFiles]);
 
   const handleFileUpload = async (files: FileList) => {
-    const uploadPromises = Array.from(files).map(async (file) => {
+    const fileArray = Array.from(files);
+    const newUploadingFiles = new Set(uploadingFiles);
+    
+    // Add files to uploading state
+    fileArray.forEach(file => {
+      newUploadingFiles.add(file.name);
+      setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
+    });
+    setUploadingFiles(newUploadingFiles);
+
+    const uploadPromises = fileArray.map(async (file) => {
       try {
-        const response = await filesApi.uploadFile(file, currentFolder || undefined);
+        const response = await filesApi.uploadFile(
+          file,
+          currentFolder || undefined,
+          (progress) => {
+            setUploadProgress(prev => ({ ...prev, [file.name]: progress }));
+          }
+        );
+        
         if (response.success) {
           toast.success(`${file.name} uploaded successfully`);
         }
       } catch (error) {
         toast.error(`Failed to upload ${file.name}`);
+      } finally {
+        // Remove from uploading state
+        setUploadingFiles(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(file.name);
+          return newSet;
+        });
+        setUploadProgress(prev => {
+          const newProgress = { ...prev };
+          delete newProgress[file.name];
+          return newProgress;
+        });
       }
     });
 
@@ -124,15 +158,43 @@ export default function DashboardPage() {
   };
 
   const handleDeleteFile = async (fileId: string) => {
+    // Optimistic update - remove file from UI immediately
+    const originalFiles = [...files];
+    setFiles(files.filter(file => file.id !== fileId));
+    
     try {
       const response = await filesApi.deleteFile(fileId);
       if (response.success) {
         toast.success('File deleted successfully');
+        // Update storage info after successful deletion
         loadFiles();
+      } else {
+        // Revert optimistic update on failure
+        setFiles(originalFiles);
+        toast.error('Failed to delete file');
       }
     } catch (error) {
+      // Revert optimistic update on error
+      setFiles(originalFiles);
       toast.error('Failed to delete file');
     }
+  };
+
+  const handleDeleteClick = (file: FileItem) => {
+    setDeleteFile(file);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteFile) {
+      handleDeleteFile(deleteFile.id);
+      setDeleteFile(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteFile(null);
+    setShowDeleteConfirm(false);
   };
 
   const handleFolderClick = (folder: FolderItem) => {
@@ -450,7 +512,7 @@ export default function DashboardPage() {
                         </button>
                       )}
                       <button
-                        onClick={() => handleDeleteFile(file.id)}
+                        onClick={() => handleDeleteClick(file)}
                         className="p-1 bg-background/80 rounded text-muted-foreground hover:text-destructive transition-colors"
                         title="Delete file"
                       >
@@ -532,7 +594,7 @@ export default function DashboardPage() {
                       </button>
                     )}
                     <button
-                      onClick={() => handleDeleteFile(file.id)}
+                      onClick={() => handleDeleteClick(file)}
                       className="p-1 text-muted-foreground hover:text-destructive transition-colors"
                       title="Delete file"
                     >
@@ -576,6 +638,45 @@ export default function DashboardPage() {
         isOpen={showPreview}
         onClose={handleClosePreview}
         file={previewFile}
+      />
+
+      {/* Upload Progress Indicator */}
+      {uploadingFiles.size > 0 && (
+        <div className="fixed bottom-4 right-4 z-50 bg-card border border-border rounded-xl shadow-2xl p-4 w-80">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Uploading Files</h3>
+          <div className="space-y-3 max-h-40 overflow-y-auto">
+            {Array.from(uploadingFiles).map((fileName) => (
+              <div key={fileName} className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-foreground truncate flex-1 mr-2" title={fileName}>
+                    {fileName}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {uploadProgress[fileName] || 0}%
+                  </span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress[fileName] || 0}%` }}
+                  ></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        title="Delete File"
+        message={`Are you sure you want to delete "${deleteFile?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
       />
     </div>
   );

@@ -39,7 +39,7 @@ export default function RegisterPage() {
     setIsLoading(true);
     const success = await register(username, password, email);
     if (success) {
-      router.push('/dashboard');
+      router.push('/login');
     }
     setIsLoading(false);
   };

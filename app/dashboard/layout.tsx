@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import {
-  FileText,
   Home,
   Upload,
   Search,
@@ -15,6 +14,7 @@ import {
   User,
   HardDrive
 } from 'lucide-react';
+import { ChartPieSlice } from 'phosphor-react';
 import { formatFileSize, filesApi } from '@/lib/api';
 
 interface DashboardLayoutProps {
@@ -68,7 +68,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="fixed inset-y-0 left-0 w-64 bg-card border-r border-border shadow-xl">
           <div className="flex h-16 items-center justify-between px-4">
             <div className="flex items-center">
-              <FileText className="h-8 w-8 text-primary" />
+              <div className="relative">
+                <ChartPieSlice className="h-8 w-8 text-blue-600 drop-shadow-lg" weight="fill" />
+                <div className="absolute inset-0 h-8 w-8 bg-blue-400 rounded-full opacity-30 blur-sm animate-pulse"></div>
+              </div>
               <span className="ml-2 text-xl font-bold text-foreground">File Vault</span>
             </div>
             <button
@@ -105,7 +108,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="flex flex-col flex-grow bg-card border-r border-border">
           {/* Logo */}
           <div className="flex h-16 items-center px-4">
-            <FileText className="h-8 w-8 text-primary" />
+            <div className="relative">
+              <ChartPieSlice className="h-8 w-8 text-blue-600 drop-shadow-lg" weight="fill" />
+              <div className="absolute inset-0 h-8 w-8 bg-blue-400 rounded-full opacity-30 blur-sm animate-pulse"></div>
+            </div>
             <span className="ml-2 text-xl font-bold text-foreground">File Vault</span>
           </div>
 
@@ -187,7 +193,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <Menu className="h-6 w-6" />
           </button>
           <div className="flex items-center">
-            <FileText className="h-6 w-6 text-primary" />
+            <div className="relative">
+              <ChartPieSlice className="h-6 w-6 text-blue-600 drop-shadow-lg" weight="fill" />
+              <div className="absolute inset-0 h-6 w-6 bg-blue-400 rounded-full opacity-30 blur-sm animate-pulse"></div>
+            </div>
             <span className="ml-2 text-lg font-semibold text-foreground">File Vault</span>
           </div>
         </div>
