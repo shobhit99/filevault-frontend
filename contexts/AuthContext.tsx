@@ -38,15 +38,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      // Try to get user info from a protected endpoint
-      // Since we don't have a /me endpoint, we'll check localStorage
+      // Check if we have tokens
+      const accessToken = localStorage.getItem('access_token');
       const savedUser = localStorage.getItem('user');
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
+      
+      if (accessToken && savedUser) {
+        try {
+          const userData = JSON.parse(savedUser);
+          setUser(userData);
+          
+          // Try to verify token with backend in background
+          authApi.verifyToken().catch(() => {
+            // Token validation failed, but don't immediately log out
+            // Let the API interceptor handle token refresh
+            console.log('Token validation failed, but keeping user logged in until token refresh fails');
+          });
+        } catch (parseError) {
+          // Invalid JSON in localStorage
+          localStorage.removeItem('user');
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          setUser(null);
+        }
+      } else if (accessToken) {
+        // Have token but no user data, try to verify
+        try {
+          const response = await authApi.verifyToken();
+          if (response.success && response.data) {
+            setUser(response.data);
+            localStorage.setItem('user', JSON.stringify(response.data));
+          } else {
+            setUser(null);
+          }
+        } catch (error) {
+          // Token verification failed
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('user');
+          setUser(null);
+        }
+      } else {
+        setUser(null);
       }
     } catch (error) {
-      // User is not authenticated
+      // Clear everything on error
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -58,8 +97,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await authApi.login({ username, password });
       
       if (response.success) {
-        setUser(response.data);
-        localStorage.setItem('user', JSON.stringify(response.data));
+        const { user } = response.data;
+        setUser(user);
+        localStorage.setItem('user', JSON.stringify(user));
         toast.success('Login successful!');
         return true;
       } else {
@@ -107,6 +147,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } finally {
       setUser(null);
       localStorage.removeItem('user');
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
       toast.success('Logged out successfully');
     }
   };

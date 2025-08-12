@@ -1,34 +1,96 @@
 import axios from 'axios';
-import Cookies from 'js-cookie';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+
+// Token management
+const getAccessToken = (): string | null => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('access_token');
+  }
+  return null;
+};
+
+const getRefreshToken = (): string | null => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('refresh_token');
+  }
+  return null;
+};
+
+const setTokens = (accessToken: string, refreshToken: string) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('access_token', accessToken);
+    localStorage.setItem('refresh_token', refreshToken);
+  }
+};
+
+const clearTokens = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
+  }
+};
 
 // Create axios instance with default config
 const api = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true, // Important for session cookies
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Add request interceptor to include CSRF token if available
+// Request interceptor to add JWT token
 api.interceptors.request.use((config) => {
-  const csrfToken = Cookies.get('csrftoken');
-  if (csrfToken) {
-    config.headers['X-CSRFToken'] = csrfToken;
+  const token = getAccessToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Response interceptor for handling errors
+// Response interceptor for handling token refresh and errors
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Redirect to login on unauthorized
-      window.location.href = '/login';
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      const refreshToken = getRefreshToken();
+      if (refreshToken) {
+        try {
+          const response = await axios.post(`${API_BASE_URL}/api/token/refresh/`, {
+            refresh: refreshToken,
+          });
+
+          const { access } = response.data;
+          setTokens(access, refreshToken);
+
+          // Retry the original request with new token
+          originalRequest.headers.Authorization = `Bearer ${access}`;
+          return api(originalRequest);
+        } catch (refreshError) {
+          // Refresh failed, clear tokens and redirect to login
+          clearTokens();
+          if (typeof window !== 'undefined' &&
+              !window.location.pathname.includes('/login') &&
+              !window.location.pathname.includes('/register')) {
+            window.location.href = '/login';
+          }
+        }
+      } else {
+        // No refresh token, clear tokens and redirect to login
+        clearTokens();
+        if (typeof window !== 'undefined' &&
+            !window.location.pathname.includes('/login') &&
+            !window.location.pathname.includes('/register')) {
+          window.location.href = '/login';
+        }
+      }
     }
+
     return Promise.reject(error);
   }
 );
@@ -40,7 +102,7 @@ export interface User {
   email: string;
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   message: string;
   data: T;
@@ -76,13 +138,40 @@ export const authApi = {
     return response.data;
   },
 
-  login: async (credentials: { username: string; password: string }): Promise<ApiResponse<User>> => {
+  login: async (credentials: { username: string; password: string }): Promise<ApiResponse<{
+    user: User;
+    access: string;
+    refresh: string;
+  }>> => {
     const response = await api.post('/api/login/', credentials);
+    if (response.data.success) {
+      const { user, access, refresh } = response.data.data;
+      setTokens(access, refresh);
+    }
     return response.data;
   },
 
   logout: async (): Promise<ApiResponse> => {
-    const response = await api.post('/api/logout/');
+    const refreshToken = getRefreshToken();
+    const response = await api.post('/api/logout/', { refresh: refreshToken });
+    clearTokens();
+    return response.data;
+  },
+
+  verifyToken: async (): Promise<ApiResponse<User>> => {
+    const response = await api.get('/api/token/verify/');
+    return response.data;
+  },
+
+  refreshToken: async (): Promise<ApiResponse<{ access: string }>> => {
+    const refreshToken = getRefreshToken();
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
+    const response = await api.post('/api/token/refresh/', { refresh: refreshToken });
+    if (response.data.access) {
+      setTokens(response.data.access, refreshToken);
+    }
     return response.data;
   },
 };
