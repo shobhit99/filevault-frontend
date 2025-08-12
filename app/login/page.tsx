@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, EyeOff, Lock, User, FileText } from 'lucide-react';
+import { Eye, EyeOff, Lock, User } from 'lucide-react';
+import { ChartPieSlice } from 'phosphor-react';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -38,8 +39,11 @@ export default function LoginPage() {
         {/* Logo and Header */}
         <div className="text-center">
           <div className="flex justify-center mb-6">
-            <div className="bg-primary/10 p-4 rounded-2xl">
-              <FileText className="h-12 w-12 text-primary" />
+            <div className="p-4 rounded-2xl relative">
+              <div className="relative">
+                <ChartPieSlice className="h-12 w-12 text-blue-600 drop-shadow-lg" weight="fill" />
+                <div className="absolute inset-0 h-12 w-12 bg-blue-400 rounded-full opacity-30 blur-sm animate-pulse"></div>
+              </div>
             </div>
           </div>
           <h2 className="text-3xl font-bold text-foreground">Welcome back</h2>
